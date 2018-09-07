@@ -1,4 +1,6 @@
-Current version 3.16.6
+Current version 3.16.8
+
+3.16.8  *) @patrickbryan, Support for lower and uppercase "S" in "PC Search" reward
 
 3.16.7  *) @dwait, Support daily search for level 1 accounts
 
