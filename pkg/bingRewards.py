@@ -202,6 +202,10 @@ class BingRewards:
     def __processHit(self, reward):
         """Processes bdp.Reward.Type.Action.HIT and returns self.RewardResult"""
         res = self.RewardResult(reward)
+        if reward.isAchieved():
+            res.message = "This reward has been already achieved"
+            return res
+
         pointsEarned = self.getRewardsPoints()
         currPage = self.getDashboardPage()
         startIndex = currPage.find('__RequestVerificationToken')
@@ -235,6 +239,52 @@ class BingRewards:
                               str(pointsEarned) + " points. Check " + filename + " for further information"
         return res
 
+    def __processQuiz(self, reward):
+        """Processes bdp.Reward.Type.Action.QUIZ and returns self.RewardResult"""
+        res = self.RewardResult(reward)
+        if reward.isAchieved():
+            res.message = "This reward has been already achieved"
+            return res
+
+        pointsEarned = self.getRewardsPoints()
+        currPage = self.getDashboardPage()
+        startIndex = currPage.find('__RequestVerificationToken')
+        endIndex = currPage[startIndex:].find('/>')
+        #pad here to get to the correct spot
+        verificationAttr = currPage[startIndex+49:startIndex+endIndex-2]
+
+        #TODO: last parameter is ', "Timezone" : 240'. Is it needed?
+        verificationData = '{"ActivitySubType" : "quiz", "ActivityType" : "notification", "OfferId" : "' + reward.hitId + '", "Channel" : "Bing.Com", "PartnerId" : "BingTrivia"}'
+
+        verificationUrl = 'https://www.bing.com/msrewards/api/v1/ReportActivity'
+
+        print
+        print "Running activity: %s" % reward.name
+        print
+
+        request = urllib2.Request(url = verificationUrl, headers = self.httpHeaders)
+        for i in range( reward.progressCurrent, reward.progressMax, 10 ):
+            print "%s - %2d/%2d - Activity: %s" % (helpers.getLoggingTime(), i+10, reward.progressMax, reward.name)
+            with self.opener.open(request, verificationData) as response:
+                page = helpers.getResponseBody(response)
+            #default pause between guesses
+            t = self.betweenQueriesInterval + random.uniform(0, self.betweenQueriesSalt)
+            time.sleep(t)
+
+
+        pointsEarned = self.getRewardsPoints() - pointsEarned
+        # if QUIZ is against bdp.Reward.Type.RE_EARN_CREDITS - check if pointsEarned is the same to
+        # pointsExpected
+        indCol = bdp.Reward.Type.Col.INDEX
+        if reward.tp[indCol] == bdp.Reward.Type.RE_EARN_CREDITS[indCol]:
+            pointsExpected = reward.progressMax - reward.progressCurrent
+            if pointsExpected != pointsEarned:
+                filename = helpers.dumpErrorPage(page)
+                res.isError = True
+                res.message = "Expected to earn " + str(pointsExpected) + " points, but earned " + \
+                              str(pointsEarned) + " points. Check " + filename + " for further information"
+        return res
+
     def __processWarn(self, reward):
         """Processes bdp.Reward.Type.Action.WARN and returns self.RewardResult"""
         res = self.RewardResult(reward)
@@ -245,10 +295,16 @@ class BingRewards:
 
         pointsEarned = self.getRewardsPoints()
         request = urllib2.Request(url = reward.url, headers = self.httpHeaders)
-        with self.opener.open(request) as response:
-            page = helpers.getResponseBody(response)
+        try:
+            with self.opener.open(request) as response:
+                page = helpers.getResponseBody(response)
+        except:
+            res.isError = True
+            res.message = "__processWarn: Unable to open url: '" + reward.url + "'"
+            return res
+
         pointsEarned = self.getRewardsPoints() - pointsEarned
-# check if we earned any points
+        # check if we earned any points
         if pointsEarned < 1:
             res.isError = True
             res.message = "Didn't earn any points for click"
@@ -452,6 +508,8 @@ class BingRewards:
 
             if action == bdp.Reward.Type.Action.HIT:
                 res = self.__processHit(r)
+            elif action == bdp.Reward.Type.Action.QUIZ:
+                res = self.__processQuiz(r)
             elif action == bdp.Reward.Type.Action.WARN:
                 res = self.__processWarn(r)
             elif action == bdp.Reward.Type.Action.SEARCH:

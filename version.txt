@@ -1,6 +1,8 @@
-Current version 3.16.8
+Current version 3.16.9
 
-3.16.8  *) @patrickbryan, Support for lower and uppercase "S" in "PC Search" reward
+3.16.9  *) @specu, Catch exception trying to open 'ms-rewards' and other unsupported URLs
+
+3.16.8  *) @specu, Support for quizzes and other daily activities
 
 3.16.7  *) @dwait, Support daily search for level 1 accounts
 
